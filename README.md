@@ -42,3 +42,5 @@ Create the hash using the KEY_ID from the key list. The command will create a fi
 ```sh
 gpg --encrypt --sign --armor --recipient KEY_ID --output hashed_password.gpg ./password.txt
 ```
+
+After creating the hash please delete the password.txt file permanently from your computer for security reasons.
