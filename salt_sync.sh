@@ -14,8 +14,6 @@ prepare_files() {
     project_name="$3"
     local_prefix="$4"
 
-    location=$(pwd)
-
     # Read filenames from the input file and save them to the output file
     while IFS= read -r filename; do
         # Use sed to remove the prefix
@@ -33,8 +31,6 @@ transfer_files() {
     remote_host="$3"
     project_name="$4"
 
-    # "$output_filename" "$local_prefix" "$remote_host" "$project_name"
-
     # Check if the temporary transfer_file file exists
     if [ ! -f "$transfer_file" ]; then
         echo "Error: Transfer file not found."
@@ -43,7 +39,8 @@ transfer_files() {
     
     # Read filenames from the input file and transfer them to the remote server
     while IFS= read -r filename; do
-        echo "PROJECT: ~/$project_name$filename"
+        echo "Local Path: $local_prefix$filename"
+        echo "Remote Path: ~/$project_name$filename"
         # create_directory_remote "$filename" "$remote_host"
         rsync -av -e ssh --rsync-path="mkdir -p $(dirname "~/$project_name$filename") && rsync" "$local_prefix$filename" "$remote_host:~/$project_name$filename"
     done < "$transfer_file"
@@ -51,12 +48,9 @@ transfer_files() {
     # Transfer the temporary file with filenames to the remote host
     scp "$transfer_file" "$remote_host:~/$project_name/$output_filename"
 
-    # Create the script folders
-    ssh "$remote_host" "mkdir -p ~/$project_name/resources/remote/"
-
     # Transfer the remote script to the remote host
-    scp "./resources/remote/remote_script.sh" "$remote_host:~/$project_name/resources/remote/remote_script.sh"
-    ssh "$remote_host" "chmod +x ~/$project_name/resources/remote/remote_script.sh"
+    scp "./remote_script.sh" "$remote_host:~/$project_name/remote_script.sh"
+    ssh "$remote_host" "chmod +x ~/$project_name/remote_script.sh"
 
     # Transfer the settings.conf to the remote host
     scp "./settings.conf" "$remote_host:~/$project_name/resources/settings.conf"
@@ -126,6 +120,8 @@ prepare_files "$project_folder" "$input_file" "$project_name" "$local_prefix"
 transfer_files "$project_folder/$project_name.tmp" "$local_prefix" "$remote_host" "$project_name"
 
 # Call the function to run the script on remote
-# run_remote_script "$remote_host" "$project_name"
+run_remote_script "$remote_host" "$project_name"
 
 echo "The script has been finished"
+
+exit 0
