@@ -1,11 +1,35 @@
 #!/bin/bash
 
+read_filepaths() {
+    # [
+    #   {"source": "a", "target": "b"},
+    #   {"source": "c", "target": "d"},
+    #   {"source": "e", "target": "f"},
+    #   {"source": "g", "target": "h"}
+    # ]
+
+    project_folder="$1"
+    input_file="$2"
+
+    # Read the input file
+    json_content=$(cat "$project_folder/$input_file")
+
+    # Parse JSON using jq (make sure jq is installed)
+    result=$(echo "$json_content" | jq -r '.[] | "source=\(.source) target=\(.target)"')
+
+    # Print the result
+    echo "$result"
+
+}
+
 # Function to read filenames from a file and save them to another file
 prepare_files() {
     project_folder="$1"
     input_file="$2"
     project_name="$3"
     local_prefix="$4"
+
+    my_result=$(read_filepaths "$project_folder" "$input_file")
 
     # Read filenames from the input file and save them to the output file
     while IFS= read -r filename; do
@@ -47,7 +71,7 @@ transfer_files() {
     ssh "$remote_host" "chmod +x ~/$project_name/$remote_script"
 
     # Transfer the settings.conf from the project folder to the remote host
-    scp "$project_folder/settings.conf" "$remote_host:~/$project_name/resources/settings.conf"
+    scp "$project_folder/settings.conf" "$remote_host:~/$project_name/settings.conf"
 
     # Delete the temporary file
     rm -rf "$project_folder/$transfer_file"
@@ -68,4 +92,9 @@ run_remote_script() {
     
     # Run the remote script
     ssh -tt "$remote_host" "echo $decrypted_password | sudo -S -v && sudo ~/$project_name/$remote_script"
+    echo "Remote script was executed"
+
+    # Delete the temporary remote files
+    # ssh "$remote_host" "rm -rf ~/$project_name"
+    # echo "Temporary files deleted on remote host"
 }

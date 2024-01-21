@@ -45,7 +45,7 @@ fi
         project_folder="${project_folder%/}"
     fi
 
-# Check if the project configuration file "settings.conf" exists exists
+# Check if the project configuration file "settings.conf" exists
 if [ ! -f "$project_folder/settings.conf" ]; then
     echo "Error: Configuration file \"$project_folder/settings.conf\" not found."
     exit 1
@@ -70,8 +70,8 @@ fi
 # transfer_files "$script_dir" "$project_name.tmp" "$local_prefix" "$remote_host" "$project_name" "$remote_script" "$project_folder"
 
 # Call the function to run the script on remote
-run_remote_script "$script_dir" "$encrypted_password" "$remote_host" "$project_name" "$remote_script"
+# run_remote_script "$script_dir" "$encrypted_password" "$remote_host" "$project_name" "$remote_script"
 
-echo "The script has been finished"
+read_filepaths "$project_folder" "$input_file"
 
 exit 0
