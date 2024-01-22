@@ -20,8 +20,8 @@ if [ ! -f "$script_dir/settings.conf" ]; then
 fi
 
 # Read the entries from main script "settings.conf" file
-remote_script=$(grep "^remote_script=" "$script_dir/settings.conf" | cut -d "=" -f 2)
-encrypted_password=$(grep "^encrypted_password=" "$script_dir/settings.conf" | cut -d "=" -f 2)
+output_filemap_file=$(grep "^output_filemap_file=" "$script_dir/settings.conf" | cut -d "=" -f 2)
+project_settings_file=$(grep "^project_settings_file=" "$script_dir/settings.conf" | cut -d "=" -f 2)
 
 # Check if script was executed with any arguments
 if [ "$#" -eq 0 ]; then
@@ -29,10 +29,8 @@ if [ "$#" -eq 0 ]; then
     exit 1
 fi
 
-# Check if the project directory from script argument exists
-project_folder="$1"
-
 # Check if $project_folder exists
+project_folder="$1"
 if [ ! -d "$project_folder" ]; then
     echo "Failed! The project directory \"$project_folder\" does not exist."
     echo "Check whether the folder path was specified correctly as the first argument."
@@ -45,33 +43,48 @@ fi
         project_folder="${project_folder%/}"
     fi
 
+# Get the absolute path of the project directory
+# project_folder=$(readlink -f "$project_folder")
+
 # Check if the project configuration file "settings.conf" exists
-if [ ! -f "$project_folder/settings.conf" ]; then
-    echo "Error: Configuration file \"$project_folder/settings.conf\" not found."
+if [ ! -f "$project_folder/$project_settings_file" ]; then
+    echo "Error: Configuration file \"$project_folder/$project_settings_file\" not found."
     exit 1
 fi
 
 # Read the project configuration file variables from settings.conf
-input_file=$(grep "^input_file=" "$project_folder/settings.conf" | cut -d "=" -f 2)
-local_prefix=$(grep "^local_prefix=" "$project_folder/settings.conf" | cut -d "=" -f 2)
+file_map=$(grep "^file_map=" "$project_folder/settings.conf" | cut -d "=" -f 2)
 remote_host=$(grep "^remote_host=" "$project_folder/settings.conf" | cut -d "=" -f 2)
+remote_script=$(grep "^remote_script=" "$project_folder/settings.conf" | cut -d "=" -f 2)
 project_name=$(grep "^project_name=" "$project_folder/settings.conf" | cut -d "=" -f 2)
+archive_name=$(grep "^archive_name=" "$project_folder/settings.conf" | cut -d "=" -f 2)
+encrypted_password=$(grep "^encrypted_password=" "$project_folder/settings.conf" | cut -d "=" -f 2)
 
 # Check if $input_file exists
-if [ ! -f "$project_folder/$input_file" ]; then
-    echo "Error: The source file \"$project_folder/$input_file\" is missing."
+if [ ! -f "$project_folder/$file_map" ]; then
+    echo "Error: The source file \"$project_folder/$file_map\" is missing."
     exit 1
 fi
 
-# Call the function to prepare files
-# prepare_files "$project_folder" "$input_file" "$project_name" "$local_prefix"
+# Prepare the archive
+prepare_archive "$project_folder" "$archive_name" "$file_map" "$remote_script" "$project_settings_file" "$output_filemap_file"
 
-# Call the function to transfer files and to create the file structure on remote
-# transfer_files "$script_dir" "$project_name.tmp" "$local_prefix" "$remote_host" "$project_name" "$remote_script" "$project_folder"
+# Create the archive
+tar -czvf "$project_folder/$archive_name.tar.gz" "$project_folder/$archive_name"
 
-# Call the function to run the script on remote
-# run_remote_script "$script_dir" "$encrypted_password" "$remote_host" "$project_name" "$remote_script"
+# Transfer archive to remote host
+# rsync -av -e ssh --rsync-path="mkdir -p $(dirname "~/$project_name") && rsync" "$project_folder/$archive_name.tar.gz" "$remote_host:~/$project_name/"
+rsync -avz -e ssh "$project_folder/$archive_name.tar.gz" "$remote_host:~/"
 
-read_filepaths "$project_folder" "$input_file"
+# unpack the archive on remote host
+ssh "$remote_host" "tar -xzvf ~/$archive_name.tar.gz"
+
+# Execute remote script
+run_remote_script "$project_folder/$encrypted_password" "$remote_host" "$project_name" "$remote_script" "$archive_name"
+
+# Clean up all temporary files
+rm -rf "$project_folder/$archive_name"
+rm -rf "$project_folder/$archive_name.tar.gz"
+ssh "$remote_host" "rm -rf ~/$archive_name.tar.gz ~/$project_name"
 
 exit 0
