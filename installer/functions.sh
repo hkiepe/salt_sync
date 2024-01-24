@@ -1,5 +1,13 @@
 #!/bin/bash
 
+
+# Function to remove trailing slash from file path
+remove_trailing_slash() {
+    local path="$1"
+    # Use parameter expansion to remove trailing slash
+    echo "${path%/}"
+}
+
 # Function to check if a file or folder is in the exclude list
 is_excluded() {
     local file_or_folder="$1"
