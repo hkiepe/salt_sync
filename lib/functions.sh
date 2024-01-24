@@ -1,71 +1,82 @@
 #!/bin/bash
 
-# Function to read filenames from a file and save them to another file
-prepare_files() {
-    project_folder="$1"
-    input_file="$2"
-    project_name="$3"
-    local_prefix="$4"
+# Reads the filemap from the json file and return a file list
+read_json() {
+    file_map=$(cat "$1")
 
-    # Read filenames from the input file and save them to the output file
-    while IFS= read -r filename; do
-        # Use sed to remove the prefix
-        result=$(echo "$filename" | sed "s|$local_prefix||")
-
-        echo "$result" >> "$project_folder/$project_name.tmp"
-    done < "$project_folder/$input_file"
-
-    echo "File names of the files to be transferred are saved to: $project_folder/$project_name.tmp"
+    # Parse JSON using jq (make sure jq is installed on the local machine)
+    file_map=$(echo "$file_map" | jq -r '.[] | "source=\(.source) target=\(.target)"')
+    echo "$file_map"
 }
 
-transfer_files() {
-    script_dir="$1"
-    transfer_file="$2"
-    local_prefix="$3"
-    remote_host="$4"
-    project_name="$5"
-    remote_script="$6"
-    project_folder="$7"
+# Iterate through the file map copy files to archive and prepare new file map
+copy_source_files_to_archive(){
+    file_map="$1"
+    project_folder="$2"
+    archive_name="$3"
+    output_filemap_file="$4"
 
-    # Check if the temporary transfer_file file exists
-    if [ ! -f "$project_folder/$transfer_file" ]; then
-        echo "Error: Transfer file not found."
-        exit 1
-    fi
-    
-    # Read filenames from the input file and transfer them to the remote server
-    while IFS= read -r filename; do
-        # create_directory_remote "$filename" "$remote_host"
-        rsync -av -e ssh --rsync-path="mkdir -p $(dirname "~/$project_name$filename") && rsync" "$local_prefix$filename" "$remote_host:~/$project_name$filename"
-    done < "$project_folder/$transfer_file"
+    # Get source file
+    initial_file_map=$(read_json "$project_folder/$file_map")
 
-    # Transfer the temporary file with filenames to the remote host
-    scp "$project_folder/$transfer_file" "$remote_host:~/$project_name/$output_filename"
+    touch "$project_folder/$archive_name/$output_filemap_file"
+    counter=1
+    while IFS= read -r initial_line; do
+        source_file=$(echo "$initial_line" | grep -oP 'source=\K[^ ]+')
+        target_file=$(echo "$initial_line" | grep -oP 'target=\K[^ ]+')
+        
+        # Cut the filepath out and create new name for the source file with counter
+        new_source_filename="$counter$(basename $source_file)"
 
-    # Transfer the remote script to the remote host
-    scp "$script_dir/$remote_script" "$remote_host:~/$project_name/$remote_script"
-    ssh "$remote_host" "chmod +x ~/$project_name/$remote_script"
+        # Copy file to archive folder and rename
+        cp "$source_file" "$project_folder/$archive_name/$new_source_filename"
 
-    # Transfer the settings.conf from the project folder to the remote host
-    scp "$project_folder/settings.conf" "$remote_host:~/$project_name/resources/settings.conf"
+        # Concatenate entry to output file
+        echo "source=$new_source_filename target=$target_file" >> "$project_folder/$archive_name/$output_filemap_file"
 
-    # Delete the temporary file
-    rm -rf "$project_folder/$transfer_file"
+        ((counter++))
+    done <<< "$initial_file_map"
+}
 
-    echo "Processing complete. Files saved to: $remote_host"
+# Coppy all files which are needed to a temporary folder in the project directory.
+# While coppying the source files, rename them and map the new names to the target.
+prepare_archive() {
+    project_folder="$1"
+    archive_name="$2"
+    file_map="$3"
+    remote_script="$4"
+    project_settings_file="$5"
+    output_filemap_file="$6"
 
+    # Create the archive folder
+    mkdir -p "$project_folder/$archive_name"
+
+    # Coppy the source file to the archive and create new mapping
+    copy_source_files_to_archive "$file_map" "$project_folder" "$archive_name" "$output_filemap_file"
+
+    # Copy remote script file into archive folder
+    cp "$project_folder/$remote_script" "$project_folder/$archive_name/$remote_script"
+
+    # Copy settings.conf file into archive folder
+    cp "$project_folder/$project_settings_file" "$project_folder/$archive_name/$settings_file"
+
+    echo "[salt_sync] Archive prepared"
 }
 
 run_remote_script() {
-    script_dir="$1"
-    encrypted_password="$2"
-    remote_host="$3"
-    project_name="$4"
-    remote_script="$5"
+    encrypted_password="$1"
+    remote_host="$2"
+    project_name="$3"
+    remote_script="$4"
+    archive_name="$5"
 
     # decrypted_password=$(gpg --quiet --decrypt $encrypted_password)
-    decrypted_password=$(gpg --decrypt $script_dir/$encrypted_password 2>/dev/null)
+    decrypted_password=$(gpg --decrypt $encrypted_password 2>/dev/null)
     
     # Run the remote script
-    ssh -tt "$remote_host" "echo $decrypted_password | sudo -S -v && sudo ~/$project_name/$remote_script"
+    ssh -tt "$remote_host" "echo $decrypted_password | sudo -S -v && sudo ~/$project_name/$archive_name/$remote_script"
+
+    # Delete the temporary remote files
+    # ssh "$remote_host" "rm -rf ~/$project_name"
+    # echo "Temporary files deleted on remote host"
 }
