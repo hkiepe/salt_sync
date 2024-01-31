@@ -19,11 +19,19 @@ chmod +x "$script_dir/installer/functions.sh"
 # import Script functions
 source $script_dir/installer/functions.sh
 
-# check if all packages are installed: gpg,
+# check if all packages are installed: gpg jq,
 if command -v gpg &> /dev/null; then
     echo "GPG is installed."
 else
     echo "GPG is not installed. Please install it."
+    exit 1
+fi
+
+if command -v jq &> /dev/null
+then
+    echo "jq is installed."
+else
+    echo "jq is not installed. Please install it."
     exit 1
 fi
 
@@ -101,7 +109,7 @@ if grep -q "^$key=" "$destination_dir/$config_file"; then
     echo "Key already exists. Skipping."
 else
     # If the key doesn't exist, append the new entry to the configuration file
-    echo -e "\n$key=$value" >> "$destination_dir/$config_file"
+    echo -e "$key=$value" >> "$destination_dir/$config_file"
     echo "Entry added: $key=$value"
 fi
 

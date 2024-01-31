@@ -60,6 +60,9 @@ project_name=$(grep "^project_name=" "$project_folder/settings.conf" | cut -d "=
 archive_name=$(grep "^archive_name=" "$project_folder/settings.conf" | cut -d "=" -f 2)
 encrypted_password=$(grep "^encrypted_password=" "$project_folder/settings.conf" | cut -d "=" -f 2)
 
+# Make remote script executable
+chmod +x "project_folder/$remote_script"
+
 # Check if $input_file exists
 if [ ! -f "$project_folder/$file_map" ]; then
     echo "Error: The source file \"$project_folder/$file_map\" is missing."

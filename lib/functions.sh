@@ -75,8 +75,4 @@ run_remote_script() {
     
     # Run the remote script
     ssh -tt "$remote_host" "echo $decrypted_password | sudo -S -v && sudo ~/$project_name/$archive_name/$remote_script"
-
-    # Delete the temporary remote files
-    # ssh "$remote_host" "rm -rf ~/$project_name"
-    # echo "Temporary files deleted on remote host"
 }
